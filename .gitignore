@@ -1,0 +1,23 @@
+# Ignore environment file
+.env
+
+# Ignore Python virtual environments
+venv/
+__pycache__/
+
+# Node modules (Next.js frontend)
+frontend/node_modules/
+
+# Compiled files
+*.pyc
+*.pyo
+*.pyd
+*.db
+*.sqlite3
+
+# VSCode settings
+.vscode/
+
+# System files
+.DS_Store
+Thumbs.db

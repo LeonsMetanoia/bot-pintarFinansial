@@ -1,0 +1,8 @@
+fastapi
+uvicorn
+requests
+instagrapi
+pydantic
+python-dotenv
+sqlalchemy
+aiosqlite
