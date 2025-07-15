@@ -7,6 +7,7 @@ from db.database import SessionLocal
 from db.crud.interaction import save_interaction, is_message_already_processed
 from datetime import datetime
 from services.coingecko_service import get_crypto_price as get_crypto_price_api
+from services.redis_service import get_cached_price, set_cached_price
 
 # Load .env
 load_dotenv()
@@ -28,14 +29,11 @@ COIN_KEYWORDS = {
     "solana": "solana",
     "bnb": "binancecoin",
     "xrp": "xrp",
-    "trx":"tron"
+    "trx": "tron"
 }
 
 
 def login_if_needed():
-    """
-    Login ke Instagram, menggunakan sesi tersimpan jika ada.
-    """
     try:
         if os.path.exists(SESSION_FILE):
             with open(SESSION_FILE, "rb") as f:
@@ -56,22 +54,23 @@ def login_if_needed():
 
 
 def get_crypto_price(coin_name: str):
-    """
-    Ambil harga coin dari CoinGecko berdasarkan keyword.
-    """
     coin_id = COIN_KEYWORDS.get(coin_name.lower())
     if coin_id:
+        cached_price = get_cached_price(coin_id)
+        if cached_price:
+            print(f"💾 Ambil dari Redis: {coin_id} = ${cached_price}")
+            return float(cached_price)
         try:
-            return get_crypto_price_api(coin_id)
+            price = get_crypto_price_api(coin_id)
+            set_cached_price(coin_id, price)
+            print(f"🌐 Ambil dari CoinGecko dan simpan ke Redis: {coin_id} = ${price}")
+            return price
         except Exception as e:
             print(f"❌ Gagal mengambil harga dari CoinGecko: {e}")
     return None
 
 
 def generate_bot_response(text: str) -> str:
-    """
-    Deteksi keyword crypto dari teks dan kembalikan respon harga.
-    """
     text = text.lower().strip()
     for keyword in COIN_KEYWORDS.keys():
         if keyword in text:
@@ -84,9 +83,6 @@ def generate_bot_response(text: str) -> str:
 
 
 def check_and_respond_to_dm():
-    """
-    Cek pesan DM dan balas jika berisi pertanyaan tentang harga crypto.
-    """
     login_if_needed()
     db = SessionLocal()
 
@@ -97,7 +93,7 @@ def check_and_respond_to_dm():
             if not thread.messages:
                 continue
 
-            for message in reversed(thread.messages):  # proses dari lama ke baru
+            for message in reversed(thread.messages):
                 if not message.text:
                     continue
 
@@ -109,18 +105,15 @@ def check_and_respond_to_dm():
                 text = message.text.strip()
                 sender_id = message.user_id
 
-                # Gunakan informasi dari objek message.user jika tersedia
                 try:
                     username = getattr(message.user, "username", None)
                     if not username:
-                        # Jika gagal, fallback dengan user_id
                         username = f"id_{sender_id}"
                 except Exception as e:
                     print(f"❌ Gagal ambil username: {e}")
                     username = f"id_{sender_id}"
 
                 print(f"📨 DM dari @{username}: {text}")
-
                 response_msg = generate_bot_response(text)
 
                 try:
@@ -143,10 +136,6 @@ def check_and_respond_to_dm():
 
 
 def simulate_bot_response(message_text: str, sender_username: str = "tester") -> str:
-    """
-    Fungsi simulasi bot tanpa harus mengirim DM ke IG.
-    Bisa digunakan via Postman / API GET untuk testing.
-    """
     message_id = f"sim_{datetime.utcnow().timestamp()}"
     response_msg = generate_bot_response(message_text)
 
