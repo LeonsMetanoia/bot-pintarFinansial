@@ -8,8 +8,9 @@ from db.crud.interaction import save_interaction, is_message_already_processed
 from datetime import datetime
 from services.coingecko_service import get_crypto_price as get_crypto_price_api
 from services.redis_service import get_cached_price, set_cached_price
+from services.llm_service import get_llm_response  # LLM via LlamaIndex + Ollama
 
-# Load .env
+# Load environment variables
 load_dotenv()
 
 USERNAME = os.getenv("IG_USERNAME")
@@ -32,7 +33,6 @@ COIN_KEYWORDS = {
     "trx": "tron"
 }
 
-
 def login_if_needed():
     try:
         if os.path.exists(SESSION_FILE):
@@ -52,7 +52,6 @@ def login_if_needed():
         print(f"❌ Login gagal: {str(e)}")
         raise
 
-
 def get_crypto_price(coin_name: str):
     coin_id = COIN_KEYWORDS.get(coin_name.lower())
     if coin_id:
@@ -69,9 +68,10 @@ def get_crypto_price(coin_name: str):
             print(f"❌ Gagal mengambil harga dari CoinGecko: {e}")
     return None
 
-
 def generate_bot_response(text: str) -> str:
     text = text.lower().strip()
+
+    # Step 1: Cari apakah cocok dengan coin
     for keyword in COIN_KEYWORDS.keys():
         if keyword in text:
             price = get_crypto_price(keyword)
@@ -79,8 +79,11 @@ def generate_bot_response(text: str) -> str:
                 return f"Harga {keyword.capitalize()} saat ini: ${price:,.2f}"
             else:
                 return f"Maaf, harga {keyword} tidak tersedia saat ini."
-    return "Maaf, saya belum mengerti pertanyaanmu. Coba sebutkan nama coin seperti 'bitcoin', 'eth', 'doge', dll."
 
+    # Step 2: Jika tidak cocok → tanya ke LLM
+    print("🧠 Pertanyaan dikirim ke LLM...")
+    llm_answer = get_llm_response(text)
+    return llm_answer
 
 def check_and_respond_to_dm():
     login_if_needed()
@@ -133,7 +136,6 @@ def check_and_respond_to_dm():
 
     finally:
         db.close()
-
 
 def simulate_bot_response(message_text: str, sender_username: str = "tester") -> str:
     message_id = f"sim_{datetime.utcnow().timestamp()}"

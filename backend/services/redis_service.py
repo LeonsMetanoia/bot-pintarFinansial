@@ -7,7 +7,11 @@ load_dotenv()
 REDIS_HOST = os.getenv("REDIS_HOST", "localhost")
 REDIS_PORT = int(os.getenv("REDIS_PORT", 6379))
 REDIS_DB = int(os.getenv("REDIS_DB", 0))
-REDIS_TTL = int(os.getenv("REDIS_TTL", 60))  # waktu cache dalam detik
+try:
+    REDIS_TTL = int(os.getenv("REDIS_TTL", "60").split()[0])
+except ValueError:
+    REDIS_TTL = 60
+
 
 redis_client = redis.Redis(
     host=REDIS_HOST,
