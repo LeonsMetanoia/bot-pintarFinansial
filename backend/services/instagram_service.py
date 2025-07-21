@@ -8,7 +8,7 @@ from db.crud.interaction import save_interaction, is_message_already_processed
 from datetime import datetime
 from services.coingecko_service import get_crypto_price as get_crypto_price_api
 from services.redis_service import get_cached_price, set_cached_price
-from services.llm_service import get_llm_response  # LLM via LlamaIndex + Ollama
+from services.llm_service import get_llm_response  # Pastikan fungsi ini didefinisikan
 
 # Load environment variables
 load_dotenv()
@@ -33,6 +33,7 @@ COIN_KEYWORDS = {
     "trx": "tron"
 }
 
+
 def login_if_needed():
     try:
         if os.path.exists(SESSION_FILE):
@@ -52,6 +53,7 @@ def login_if_needed():
         print(f"❌ Login gagal: {str(e)}")
         raise
 
+
 def get_crypto_price(coin_name: str):
     coin_id = COIN_KEYWORDS.get(coin_name.lower())
     if coin_id:
@@ -68,6 +70,7 @@ def get_crypto_price(coin_name: str):
             print(f"❌ Gagal mengambil harga dari CoinGecko: {e}")
     return None
 
+
 def generate_bot_response(text: str) -> str:
     text = text.lower().strip()
 
@@ -82,8 +85,13 @@ def generate_bot_response(text: str) -> str:
 
     # Step 2: Jika tidak cocok → tanya ke LLM
     print("🧠 Pertanyaan dikirim ke LLM...")
-    llm_answer = get_llm_response(text)
-    return llm_answer
+    try:
+        llm_answer = get_llm_response(text)
+        return llm_answer
+    except Exception as e:
+        print(f"❌ Error dari LLM: {e}")
+        return "Maaf, saya tidak bisa memproses pertanyaan Anda saat ini."
+
 
 def check_and_respond_to_dm():
     login_if_needed()
@@ -91,6 +99,10 @@ def check_and_respond_to_dm():
 
     try:
         threads = cl.direct_threads(amount=10)
+
+        if not threads:
+            print("📭 Tidak ada DM masuk.")
+            return
 
         for thread in threads:
             if not thread.messages:
@@ -109,9 +121,7 @@ def check_and_respond_to_dm():
                 sender_id = message.user_id
 
                 try:
-                    username = getattr(message.user, "username", None)
-                    if not username:
-                        username = f"id_{sender_id}"
+                    username = getattr(message.user, "username", f"id_{sender_id}")
                 except Exception as e:
                     print(f"❌ Gagal ambil username: {e}")
                     username = f"id_{sender_id}"
@@ -136,6 +146,7 @@ def check_and_respond_to_dm():
 
     finally:
         db.close()
+
 
 def simulate_bot_response(message_text: str, sender_username: str = "tester") -> str:
     message_id = f"sim_{datetime.utcnow().timestamp()}"

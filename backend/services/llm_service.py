@@ -1,39 +1,57 @@
-# backend/services/llm_service.py
-
-from llama_index.core import SimpleDirectoryReader, VectorStoreIndex
-from llama_index.llms.ollama import Ollama
+from llama_index.core import VectorStoreIndex, Settings
+from llama_index.vector_stores.chroma import ChromaVectorStore
 from llama_index.embeddings.huggingface import HuggingFaceEmbedding
-import logging
+from llama_index.llms.ollama import Ollama
+from llama_index.core.node_parser import SentenceSplitter
+from llama_index.core import SimpleDirectoryReader
 
-# Inisialisasi logger
-logger = logging.getLogger(__name__)
+import chromadb
+import os
 
-# 1. Inisialisasi LLM lokal (pastikan `ollama run mistral` sedang berjalan)
+persist_dir = "./chroma_db"
+
+# Inisialisasi komponen
 llm = Ollama(model="mistral")
-
-# 2. Inisialisasi model embedding lokal (gratis, tidak butuh API key)
 embed_model = HuggingFaceEmbedding(model_name="sentence-transformers/all-MiniLM-L6-v2")
+text_splitter = SentenceSplitter(chunk_size=512, chunk_overlap=50)
 
-# 3. Fungsi membuat query engine dengan LLM + embedding lokal
+# Set default settings secara global
+Settings.llm = llm
+Settings.embed_model = embed_model
+Settings.node_parser = text_splitter
+
+# Fungsi untuk get_query_engine
 def get_query_engine():
     try:
-        docs = SimpleDirectoryReader("data/crypto-docs").load_data()
-        index = VectorStoreIndex.from_documents(docs, embed_model=embed_model)
-        query_engine = index.as_query_engine(llm=llm)
-        logger.info("✅ Query engine berhasil dibuat.")
-        return query_engine
+        # Load dokumen dari direktori
+        docs = SimpleDirectoryReader("data/docs-bot").load_data()
+        print(f"📄 Jumlah dokumen dibaca: {len(docs)}")
+
+        # Tampilkan 3 contoh dokumen pertama
+        for i, doc in enumerate(docs[:3]):
+            print(f"\n📘 Dokumen #{i+1}")
+            print(f"➡️ Nama file asal: {doc.metadata.get('file_name', 'Tidak diketahui')}")
+            print(f"📝 Cuplikan isi: {doc.text[:200]}...")
+
+        # Setup Chroma dan Storage Context
+        db = chromadb.PersistentClient(path=persist_dir)
+        chroma_store = ChromaVectorStore(chroma_collection=db.get_or_create_collection("finance_bot"))
+
+        # Buat index dari dokumen
+        index = VectorStoreIndex.from_documents(
+            documents=docs,
+            vector_store=chroma_store,
+        )
+
+        # Kembalikan query engine
+        return index.as_query_engine()
+
     except Exception as e:
-        logger.error(f"❌ Gagal membuat query engine: {e}")
+        print(f"❌ Error creating query engine: {e}")
         raise
 
-# 4. Inisialisasi query engine saat aplikasi start
-query_engine = get_query_engine()
-
-# 5. Fungsi untuk memproses pertanyaan
-def get_llm_response(question: str) -> str:
-    try:
-        response = query_engine.query(question)
-        return str(response)
-    except Exception as e:
-        logger.error(f"❌ Error saat menjawab pertanyaan: {e}")
-        return f"Terjadi error saat menjawab pertanyaan: {e}"
+# Fungsi utama untuk digunakan dari luar
+def get_llm_response(query: str) -> str:
+    engine = get_query_engine()
+    response = engine.query(query)
+    return str(response)
