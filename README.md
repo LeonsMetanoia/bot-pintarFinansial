@@ -1,5 +1,11 @@
 # 🤖 Bot PintarFinansial
 
+<p align="center">
+  <img src="https://github.com/user-attachments/assets/b16aacc6-fceb-4dbd-9453-5780bae3eed1" alt="CelebrateRoboGIF" />
+</p>
+
+
+
 **Bot PintarFinansial** is an intelligent chatbot system designed to educate users on financial topics. It integrates seamlessly with Instagram Direct Messages (DM) using [Instagrapi](https://github.com/adw0rd/instagrapi), and answers user questions based on a collection of finance-related documents using Retrieval-Augmented Generation (RAG).
 
 ---
@@ -60,3 +66,4 @@ This project is licensed under the MIT License.
 - [ChromaDB](https://www.trychroma.com/)
 - [Instagrapi](https://github.com/adw0rd/instagrapi)
 - [FastAPI](https://fastapi.tiangolo.com/)
+
